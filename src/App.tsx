@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import PublicAuditionsPage from './PublicAuditionsPage'
 import type { Audition, AuditionStatus } from './types'
 
-function statusActions(status: AuditionStatus): AuditionStatus[] {
-  if (status === 'draft') return ['scheduled']
-  if (status === 'scheduled') return ['posted']
-  return []
+const publicAuditionsPath = '/auditions'
+
+function isPublicAuditionsPage(): boolean {
+  return window.location.pathname === publicAuditionsPath
 }
 
 export default function App() {
@@ -25,6 +26,20 @@ export default function App() {
       setError(error instanceof Error ? error.message : 'Unable to load auditions')
     })
   }, [])
+
+  if (isPublicAuditionsPage()) {
+    return <PublicAuditionsPage auditions={auditions} />
+  }
+
+  async function postAudition(id: number) {
+    setError('')
+    const response = await fetch(`/api/auditions/${id}/post`, { method: 'POST' })
+    if (response.ok) {
+      await loadAuditions()
+      return
+    }
+    setError(`Post request failed (${response.status})`)
+  }
 
   async function submitAudition(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -112,11 +127,16 @@ export default function App() {
             <strong>{audition.hamsterName}</strong> — {audition.danceStyle}
             <code>{new Date(audition.scheduledAt).toLocaleString()}</code>
             <span>{audition.status}</span>
-            {statusActions(audition.status).map((status) => (
-              <button key={status} type="button" onClick={() => updateStatus(audition.id, status)}>
-                Mark {status}
+            {audition.status === 'draft' && (
+              <button type="button" onClick={() => updateStatus(audition.id, 'scheduled')}>
+                Mark scheduled
               </button>
-            ))}
+            )}
+            {audition.status === 'scheduled' && (
+              <button type="button" onClick={() => postAudition(audition.id)}>
+                Post
+              </button>
+            )}
             <button type="button" onClick={() => deleteAudition(audition.id)}>
               Delete
             </button>

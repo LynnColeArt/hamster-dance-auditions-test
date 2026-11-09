@@ -4,6 +4,8 @@ import {
   deleteAudition,
   getAudition,
   listAuditions,
+  NotAllowedError,
+  postAudition,
   updateAudition,
   ValidationError,
 } from './auditions.mjs'
@@ -16,8 +18,9 @@ export function createApplication(database) {
     response.json({ ok: true })
   })
 
-  application.get('/api/auditions', (_request, response) => {
-    response.json(listAuditions(database))
+  application.get('/api/auditions', (request, response) => {
+    const status = request.query.status
+    response.json(listAuditions(database, { status: typeof status === 'string' ? status : undefined }))
   })
 
   application.post('/api/auditions', (request, response) => {
@@ -36,6 +39,12 @@ export function createApplication(database) {
     response.json(audition)
   })
 
+  application.post('/api/auditions/:id/post', (request, response) => {
+    const audition = postAudition(database, request.params.id)
+    if (audition === undefined) return response.sendStatus(404)
+    response.json(audition)
+  })
+
   application.delete('/api/auditions/:id', (request, response) => {
     const result = deleteAudition(database, request.params.id)
     if (result.changes === 0) return response.sendStatus(404)
@@ -48,6 +57,7 @@ export function createApplication(database) {
 
   application.use((error, _request, response, _next) => {
     if (error instanceof ValidationError) return response.status(400).json({ message: error.message })
+    if (error instanceof NotAllowedError) return response.status(409).json({ message: error.message })
     response.status(500).json({ message: 'Internal server error' })
   })
 
