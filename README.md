@@ -25,10 +25,11 @@ Vite proxies `/api` to the API server on `127.0.0.1:4000`.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/healthz` | Readiness check |
-| `GET` | `/api/auditions` | List auditions |
+| `GET` | `/api/auditions` | List auditions; use `?status=posted` to filter |
 | `POST` | `/api/auditions` | Create an audition |
 | `GET` | `/api/auditions/:id` | Read one audition |
 | `PATCH` | `/api/auditions/:id` | Update fields or transition status |
+| `POST` | `/api/auditions/:id/post` | Post an audition; only from `scheduled` |
 | `DELETE` | `/api/auditions/:id` | Delete an audition |
 
 Create payload fields: `hamster_name`, `dance_style`, `scheduled_at`, and an
@@ -46,3 +47,6 @@ curl -d '{"hamster_name":"Pickle","dance_style":"moonwalk","scheduled_at":"2026-
 
 curl http://127.0.0.1:4000/api/auditions
 ```
+
+The public, read-only audition list is available at `http://localhost:5173/auditions`
+in development.

@@ -2,6 +2,8 @@ import { AUDITION_STATUSES } from './db.mjs'
 
 export class ValidationError extends Error {}
 
+export class NotAllowedError extends Error {}
+
 function assertRequestObject(input, action) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
     throw new ValidationError(`Request body must be a JSON object for ${action}`)
@@ -46,14 +48,25 @@ function assertAllowedFields(input, allowedFields) {
   }
 }
 
-export function listAuditions(database) {
+export function listAuditions(database, { status } = {}) {
+  if (status === undefined) {
+    return database
+      .prepare(
+        `SELECT id, hamster_name, dance_style, scheduled_at, status, created_at
+         FROM auditions
+         ORDER BY created_at, id`,
+      )
+      .all()
+  }
+
   return database
     .prepare(
       `SELECT id, hamster_name, dance_style, scheduled_at, status, created_at
        FROM auditions
+       WHERE status = ?
        ORDER BY created_at, id`,
     )
-    .all()
+    .all(parseStatus(status, { required: true }))
 }
 
 export function createAudition(database, input) {
@@ -102,6 +115,9 @@ export function updateAudition(database, id, input) {
     changes.scheduled_at = parseScheduledAt(request.scheduled_at)
   }
   if (request.status !== undefined) {
+    if (request.status === 'posted') {
+      throw new ValidationError('Use POST /api/auditions/:id/post to post an audition')
+    }
     changes.status = parseStatus(request.status, { required: true })
   }
 
@@ -122,4 +138,22 @@ export function updateAudition(database, id, input) {
 export function deleteAudition(database, id) {
   const auditionId = parseId(id)
   return database.prepare('DELETE FROM auditions WHERE id = ?').run(auditionId)
+}
+
+export function postAudition(database, id) {
+  const auditionId = parseId(id)
+  const audition = getAudition(database, auditionId)
+  if (audition === undefined) return undefined
+  if (audition.status !== 'scheduled') {
+    throw new NotAllowedError('Only scheduled auditions can be posted')
+  }
+
+  return database
+    .prepare(
+      `UPDATE auditions
+       SET status = 'posted'
+       WHERE id = ? AND status = 'scheduled'
+       RETURNING id, hamster_name, dance_style, scheduled_at, status, created_at`,
+    )
+    .get(auditionId)
 }
